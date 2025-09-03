@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>构建配置表</title>
+	<style>
+		*{box-sizing:border-box}
+		body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','PingFang SC','Microsoft YaHei',sans-serif;color:#1f2937;background:#f7f7f8}
+		.header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 16px}
+		.header h1{margin:0;font-size:18px}
+		.container{padding:16px}
+		.toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px}
+		.btn{height:32px;padding:0 12px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer}
+		.btn.primary{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
+		.btn.danger{background:#ef4444;color:#fff;border-color:#ef4444}
+		.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+		.table th,.table td{vertical-align:top;padding:10px;border-bottom:1px solid #f3f4f6;font-size:13px}
+		.table th{background:#f9fafb;color:#374151;text-align:left}
+		textarea{width:100%;min-height:80px;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:12px;border:1px solid #d1d5db;border-radius:6px;padding:8px;outline:none;background:#fff}
+		.input{width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;outline:none}
+		.row-actions{display:flex;gap:8px}
+		.note{color:#6b7280;font-size:12px;margin:8px 0}
+		.flex{display:flex;gap:8px}
+		.preview{margin-top:12px;border:1px dashed #d1d5db;border-radius:8px;padding:12px;background:#fff}
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h1>构建配置表</h1>
+	</div>
+	<div class="container">
+		<div class="toolbar">
+			<div class="flex">
+				<button class="btn" onclick="addRule()">＋ 新增规则</button>
+				<button class="btn" onclick="importExamples()">导入示例</button>
+				<button class="btn" onclick="exportJSON()">导出JSON</button>
+				<button class="btn" onclick="saveLocal()">保存到本地</button>
+			</div>
+			<div class="flex">
+				<button class="btn" onclick="history.back()">返回</button>
+			</div>
+		</div>
+
+		<p class="note">适用场景：1) 文本替换（人名/行业用语/商品名）；2) 满足条件时补充信息（公式）；3) SQL 兜底映射（如列值替换）。</p>
+
+		<table class="table">
+			<thead>
+				<tr>
+					<th style="width:6%">is_functional</th>
+					<th style="width:18%">text_condition<br/><span class="note">文本条件，支持 &&、||、!!</span></th>
+					<th style="width:20%">query_function(JSON)<br/><span class="note">{"append":[],"delete":[],"replace":{}}</span></th>
+					<th style="width:16%">formula_function<br/><span class="note">例：总销售额：SUM(销售额)</span></th>
+					<th style="width:18%">sql_condition<br/><span class="note">最终SQL匹配条件，如 students||courses&&!!scores</span></th>
+					<th style="width:18%">sql_function(JSON)<br/><span class="note">{"replace":{"status = '请假'":"status = 0"}}</span></th>
+					<th style="width:8%">操作</th>
+				</tr>
+			</thead>
+			<tbody id="tbody"></tbody>
+		</table>
+
+		<div class="preview">
+			<div class="note">预览：输入问题与SQL，点击应用以查看规则处理后的结果（仅前端演示）。</div>
+			<div class="flex">
+				<textarea id="pvQ" placeholder="示例：张三上个月的销售额是多少？"></textarea>
+			</div>
+			<div class="flex" style="margin-top:8px">
+				<button class="btn" onclick="applyPreview()">应用规则预览</button>
+				<button class="btn" onclick="clearPreview()">清空</button>
+			</div>
+			<div class="flex" style="margin-top:8px">
+				<textarea id="pvS2" placeholder="处理后的SQL" readonly></textarea>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		const $ = s=>document.querySelector(s);
+		const tbody = $('#tbody');
+		let rules = loadLocal() || [];
+
+		function render(){
+			tbody.innerHTML='';
+			rules.forEach((r,i)=> tbody.appendChild(row(r,i)));
+		}
+		function row(r,i){
+			const tr=document.createElement('tr');
+			tr.innerHTML = `
+				<td><input class="input" style="width:60px" value="${r.is_functional ?? 1}" oninput="bind(${i},'is_functional',this.value)"/></td>
+				<td><textarea oninput="bind(${i},'text_condition',this.value)">${esc(r.text_condition||'')}</textarea></td>
+				<td><textarea placeholder='{"append":[],"delete":[],"replace":{}}' oninput="bind(${i},'query_function',this.value)">${esc(r.query_function||'')}</textarea></td>
+				<td><textarea placeholder="总销售额：SUM(销售额)" oninput="bind(${i},'formula_function',this.value)">${esc(r.formula_function||'')}</textarea></td>
+				<td><textarea placeholder="students||student_courses&&!!courses" oninput="bind(${i},'sql_condition',this.value)">${esc(r.sql_condition||'')}</textarea></td>
+				<td><textarea placeholder='{"replace":{"status = "请假"":"status = 0"}}' oninput="bind(${i},'sql_function',this.value)">${esc(r.sql_function||'')}</textarea></td>
+				<td class="row-actions"><button class="btn" onclick="dup(${i})">复制</button><button class="btn danger" onclick="del(${i})">删除</button></td>`;
+			return tr;
+		}
+		function bind(i,k,v){ rules[i][k]=v; saveLocal(); }
+		function addRule(){ rules.push({is_functional:1,text_condition:'',query_function:'',formula_function:'',sql_condition:'',sql_function:''}); render(); saveLocal(); }
+		function dup(i){ rules.splice(i+1,0,JSON.parse(JSON.stringify(rules[i]))); render(); saveLocal(); }
+		function del(i){ rules.splice(i,1); render(); saveLocal(); }
+		function saveLocal(){ localStorage.setItem('config_rules', JSON.stringify(rules)); }
+		function loadLocal(){ try{return JSON.parse(localStorage.getItem('config_rules')||'[]')}catch(e){return []} }
+		function exportJSON(){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(rules,null,2)],{type:'application/json'})); a.download='config_rules.json'; a.click(); }
+		function importExamples(){
+			rules = rules.concat([
+				{ is_functional:1, text_condition:'张三', query_function:'{"replace":{"张三":"ZS001"}}', formula_function:'', sql_condition:'', sql_function:'' },
+				{ is_functional:1, text_condition:'总销售额', query_function:'', formula_function:'总销售额：SUM(销售额)', sql_condition:'', sql_function:'' },
+				{ is_functional:1, text_condition:'', query_function:'', formula_function:'', sql_condition:'student_courses', sql_function:'{"replace":{"status = "请假"":"status = 0"}}' }
+			]);
+			render(); saveLocal();
+		}
+
+		// 预览规则应用（前端简化版）
+		function applyPreview(){
+			let q = $('#pvQ').value || '';
+			let s = $('#pvS').value || '';
+			for(const r of rules){
+				if(String(r.is_functional||1) !== '1') continue;
+				// 文本条件命中：简单包含与否
+				let hit = true;
+				if(r.text_condition){
+					const cond = r.text_condition;
+					// 支持 &&、||、!! 的极简解析
+					hit = evalCond(cond, q);
+				}
+				if(hit){
+					if(r.query_function){ q = applyQueryFn(q, r.query_function); }
+					if(r.formula_function){ q = q + '。' + r.formula_function; }
+				}
+				if(r.sql_condition){ if(matchSqlCond(s, r.sql_condition)){ if(r.sql_function){ s = applySqlFn(s, r.sql_function); } } }
+			}
+			$('#pvQ2').value = q; $('#pvS2').value = s;
+		}
+		function clearPreview(){ $('#pvQ').value=''; $('#pvS').value=''; $('#pvQ2').value=''; $('#pvS2').value=''; }
+
+		function evalCond(cond, text){
+			// 极简：支持 a&&b、a||b、!!a，按包含判断
+			try{
+				let expr = cond.replace(/\s+/g,' ')
+					.replace(/!!([^&|]+)/g, (m,p)=> `!inc(${JSON.stringify(p.trim())})`)
+					.replace(/([^&|]+)\s*&&\s*([^&|]+)/g, (m,a,b)=> `(inc(${JSON.stringify(a.trim())})&&inc(${JSON.stringify(b.trim())}))`)
+					.replace(/([^&|]+)\s*\|\|\s*([^&|]+)/g, (m,a,b)=> `(inc(${JSON.stringify(a.trim())})||inc(${JSON.stringify(b.trim())}))`);
+				const inc = (k)=> text.includes(k);
+				// 若表达式没有 && 或 ||，当作单独关键词
+				if(!/[&|]/.test(cond)) return inc(cond.trim());
+				return Function('inc', `return ${expr}`)(inc);
+			}catch(e){ return text.includes(cond); }
+		}
+		function applyQueryFn(text, json){
+			let cfg={}; try{ cfg=JSON.parse(json); }catch(e){ return text; }
+			if(cfg.append){ for(const t of cfg.append){ text += String(t); } }
+			if(cfg.delete){ for(const t of cfg.delete){ text = text.replaceAll(String(t),''); } }
+			if(cfg.replace){ for(const k in cfg.replace){ text = text.replaceAll(k, cfg.replace[k]); } }
+			return text;
+		}
+		function matchSqlCond(sql, cond){
+			if(!cond) return true;
+			const parts = cond.split('&&').map(s=>s.trim());
+			return parts.every(p=> p.startsWith('!!') ? !sql.includes(p.slice(2)) : sql.includes(p));
+		}
+		function applySqlFn(sql, json){ let cfg={}; try{cfg=JSON.parse(json);}catch(e){return sql;} if(cfg.replace){for(const k in cfg.replace){ sql = sql.replaceAll(k, cfg.replace[k]); }} return sql; }
+		function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
+
+		render();
+	</script>
+</body>
+</html> 

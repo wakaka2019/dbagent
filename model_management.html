@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>模型管理</title>
+	<style>
+		*{box-sizing:border-box}
+		body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','PingFang SC','Microsoft YaHei',sans-serif;color:#1f2937;background:#f7f7f8}
+		.header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 16px}
+		.header h1{margin:0;font-size:18px}
+		.container{padding:16px}
+		.toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px}
+		.btn{height:32px;padding:0 12px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer}
+		.btn.primary{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
+		.btn.danger{background:#ef4444;color:#fff;border-color:#ef4444}
+		.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+		.table th,.table td{vertical-align:top;padding:10px;border-bottom:1px solid #f3f4f6;font-size:13px}
+		.table th{background:#f9fafb;color:#374151;text-align:left}
+		.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px}
+		.badge.gray{background:#f3f4f6;color:#374151}
+		.badge.blue{background:#dbeafe;color:#1e3a8a}
+		.badge.green{background:#dcfce7;color:#166534}
+		.badge.yellow{background:#fef9c3;color:#854d0e}
+		.badge.red{background:#fee2e2;color:#991b1b}
+		.note{color:#6b7280;font-size:12px;margin:8px 0}
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h1>模型管理</h1>
+	</div>
+	<div class="container">
+		<div class="toolbar">
+			<div>
+				<button class="btn" onclick="createTrainJob()">创建训练任务</button>
+				<button class="btn" onclick="refresh()">刷新</button>
+			</div>
+			<div>
+				<button class="btn" onclick="history.back()">返回</button>
+			</div>
+		</div>
+
+		<table class="table">
+			<thead>
+				<tr>
+					<th style="width:20%">模型ID/名称</th>
+					<th style="width:12%">训练状态</th>
+					<th style="width:12%">部署状态</th>
+					<th style="width:22%">创建时间 / 更新时间</th>
+					<th style="width:18%">说明</th>
+					<th style="width:20%">操作</th>
+				</tr>
+			</thead>
+			<tbody id="tbody"></tbody>
+		</table>
+
+		<div class="note">训练状态：training / saved_oss；部署状态：init / deploying / serving / failed / waiting / waiting_deploying / deleting</div>
+	</div>
+
+	<script>
+		let models = loadLocal() || [];
+		let activeModelId = localStorage.getItem('active_model_id') || '';
+
+		function render(){
+			const tbody = document.getElementById('tbody');
+			tbody.innerHTML='';
+			models.forEach((m,i)=>{
+				const tr = document.createElement('tr');
+				tr.innerHTML = `
+					<td>${m.id || ('mdl_'+i)}${activeModelId===(m.id||('mdl_'+i))? ' <span class="badge green">生效</span>':''}<br/><span class="note">${m.name||''}</span></td>
+					<td>${badgeTrain(m.train_status)}</td>
+					<td>${badgeDeploy(m.deploy_status)}</td>
+					<td><div>${m.created_at||'-'}</div><div class="note">${m.updated_at||'-'}</div></td>
+					<td>${m.desc||''}</td>
+					<td>
+						<button class="btn" onclick="evalModel(${i})">评测</button>
+						<button class="btn" onclick="markActive(${i})">设为生效</button>
+						<button class="btn" onclick="deploy(${i})">部署</button>
+						<button class="btn danger" onclick="del(${i})">删除</button>
+					</td>`;
+				tbody.appendChild(tr);
+			});
+		}
+		function badgeTrain(s){ const map={training:'blue',saved_oss:'gray'}; return `<span class="badge ${map[s]||'gray'}">${s||'-'}</span>`; }
+		function badgeDeploy(s){ const map={init:'gray',deploying:'blue',serving:'green',failed:'red',waiting:'yellow',waiting_deploying:'yellow',deleting:'red'}; return `<span class="badge ${map[s]||'gray'}">${s||'-'}</span>`; }
+		function save(){ localStorage.setItem('models', JSON.stringify(models)); }
+		function loadLocal(){ try{return JSON.parse(localStorage.getItem('models')||'[]')}catch(e){return []} }
+		function createTrainJob(){
+			const id = 'mdl_'+Date.now();
+			models.unshift({id, name:'模板模型-'+new Date().toLocaleString(), train_status:'training', deploy_status:'init', created_at:new Date().toLocaleString(), updated_at:new Date().toLocaleString(), desc:'由模板问题训练生成'});
+			save(); render();
+			setTimeout(()=>{ const m=models.find(x=>x.id===id); if(m){ m.train_status='saved_oss'; m.updated_at=new Date().toLocaleString(); save(); render(); } }, 2000);
+		}
+		function deploy(i){ const m=models[i]; if(!m) return; m.deploy_status='deploying'; m.updated_at=new Date().toLocaleString(); save(); render(); setTimeout(()=>{ m.deploy_status='serving'; m.updated_at=new Date().toLocaleString(); save(); render(); },1500); }
+		function del(i){ models.splice(i,1); save(); render(); }
+		function markActive(i){ activeModelId = models[i].id; localStorage.setItem('active_model_id', activeModelId); render(); }
+		function refresh(){ models = loadLocal(); render(); }
+		function evalModel(i){ const id = models[i].id || ('mdl_'+i); location.href = 'evaluate_model.html?model_id='+encodeURIComponent(id); }
+
+		render();
+	</script>
+</body>
+</html> 

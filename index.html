@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>智能体配置原型系统</title>
+	<style>
+		* { box-sizing: border-box; }
+		body { 
+			margin: 0; 
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif; 
+			color: #1f2937; 
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+		}
+		.container { 
+			max-width: 1200px; 
+			margin: 0 auto; 
+			padding: 40px 20px; 
+		}
+		.header { 
+			text-align: center; 
+			margin-bottom: 60px; 
+			color: #fff; 
+		}
+		.header h1 { 
+			font-size: 3rem; 
+			margin: 0 0 16px; 
+			font-weight: 700; 
+			text-shadow: 0 2px 4px rgba(0,0,0,0.3); 
+		}
+		.header p { 
+			font-size: 1.2rem; 
+			margin: 0; 
+			opacity: 0.9; 
+		}
+		.grid { 
+			display: grid; 
+			grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); 
+			gap: 24px; 
+			margin-bottom: 40px; 
+		}
+		.card { 
+			background: #fff; 
+			border-radius: 16px; 
+			padding: 32px; 
+			box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
+			transition: all 0.3s ease; 
+			text-decoration: none; 
+			color: inherit; 
+			display: block; 
+		}
+		.card:hover { 
+			transform: translateY(-8px); 
+			box-shadow: 0 20px 40px rgba(0,0,0,0.3); 
+		}
+		.card-icon { 
+			font-size: 3rem; 
+			margin-bottom: 20px; 
+			display: block; 
+		}
+		.card h3 { 
+			font-size: 1.5rem; 
+			margin: 0 0 12px; 
+			color: #111827; 
+		}
+		.card p { 
+			color: #6b7280; 
+			line-height: 1.6; 
+			margin: 0; 
+		}
+		.card-meta { 
+			margin-top: 20px; 
+			padding-top: 20px; 
+			border-top: 1px solid #e5e7eb; 
+			display: flex; 
+			justify-content: space-between; 
+			align-items: center; 
+		}
+		.status { 
+			font-size: 0.875rem; 
+			padding: 4px 12px; 
+			border-radius: 999px; 
+			background: #dcfce7; 
+			color: #166534; 
+		}
+		.status.complete { 
+			background: #dbeafe; 
+			color: #1e3a8a; 
+		}
+		.status.pending { 
+			background: #fef3c7; 
+			color: #92400e; 
+		}
+		.footer { 
+			text-align: center; 
+			color: #fff; 
+			opacity: 0.8; 
+			margin-top: 60px; 
+		}
+		.footer a { 
+			color: #fff; 
+			text-decoration: underline; 
+		}
+		.progress-bar { 
+			width: 100%; 
+			height: 6px; 
+			background: #e5e7eb; 
+			border-radius: 3px; 
+			overflow: hidden; 
+			margin-top: 12px; 
+		}
+		.progress-fill { 
+			height: 100%; 
+			background: linear-gradient(90deg, #10b981, #059669); 
+			transition: width 0.3s ease; 
+		}
+		@media (max-width: 768px) { 
+			.header h1 { font-size: 2rem; }
+			.grid { grid-template-columns: 1fr; }
+			.container { padding: 20px; }
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="header">
+			<h1>🤖 智能体配置原型系统</h1>
+			<p>完整的数据库智能体配置流程和界面原型</p>
+		</div>
+
+		<div class="grid">
+			<a href="create_agent.html" class="card">
+				<span class="card-icon">🚀</span>
+				<h3>新建智能体</h3>
+				<p>配置智能体基本信息、环境、数据服务类型等，支持多选数据表名</p>
+				<div class="card-meta">
+					<span class="status">已完成</span>
+					<span>步骤 1/6</span>
+				</div>
+				<div class="progress-bar">
+					<div class="progress-fill" style="width: 16.67%"></div>
+				</div>
+			</a>
+
+			<a href="prototype_wireframe.html" class="card">
+				<span class="card-icon">📊</span>
+				<h3>表选择与字段配置</h3>
+				<p>选择数据库表，配置字段注释和AI注释，支持数据抽样和迁移</p>
+				<div class="card-meta">
+					<span class="status">已完成</span>
+					<span>步骤 2/6</span>
+				</div>
+				<div class="progress-bar">
+					<div class="progress-fill" style="width: 33.33%"></div>
+				</div>
+			</a>
+
+			<a href="template_config.html" class="card">
+				<span class="card-icon">📝</span>
+				<h3>配置问题模板</h3>
+				<p>自定义SQL问题模板和参数，支持异步保存和用户友好交互</p>
+				<div class="card-meta">
+					<span class="status complete">已完成</span>
+					<span>步骤 3/6</span>
+				</div>
+				<div class="progress-bar">
+					<div class="progress-fill" style="width: 50%"></div>
+				</div>
+			</a>
+
+			<a href="config_table.html" class="card">
+				<span class="card-icon">⚙️</span>
+				<h3>构建配置表</h3>
+				<p>定义文本替换、信息补充、SQL映射规则，支持实时自动保存</p>
+				<div class="card-meta">
+					<span class="status complete">已完成</span>
+					<span>步骤 4/6</span>
+				</div>
+				<div class="progress-bar">
+					<div class="progress-fill" style="width: 66.67%"></div>
+				</div>
+			</a>
+
+			<a href="model_management.html" class="card">
+				<span class="card-icon">🤖</span>
+				<h3>模型管理</h3>
+				<p>查看、训练、部署AI模型，管理模型状态和选择生效模型</p>
+				<div class="card-meta">
+					<span class="status">已完成</span>
+					<span>步骤 5/6</span>
+				</div>
+				<div class="progress-bar">
+					<div class="progress-fill" style="width: 83.33%"></div>
+				</div>
+			</a>
+
+			<a href="evaluate_model.html" class="card">
+				<span class="card-icon">📈</span>
+				<h3>模型评测</h3>
+				<p>测试模型效果，支持多测试集管理，AI判断SQL语义等价性</p>
+				<div class="card-meta">
+					<span class="status">已完成</span>
+					<span>步骤 6/6</span>
+				</div>
+				<div class="progress-bar">
+					<div class="progress-fill" style="width: 100%"></div>
+				</div>
+			</a>
+		</div>
+
+		<div class="footer">
+			<p>🎯 这是一个原型系统，用于演示智能体配置流程</p>
+			<p>💡 建议按照步骤顺序体验完整流程</p>
+			<p>📚 查看 <a href="README.md">README.md</a> 了解更多信息</p>
+		</div>
+	</div>
+
+	<script>
+		// 检查页面完成状态
+		function checkPageStatus() {
+			const pages = [
+				'create_agent.html',
+				'prototype_wireframe.html', 
+				'template_config.html',
+				'config_table.html',
+				'model_management.html',
+				'evaluate_model.html'
+			];
+			
+			// 这里可以添加页面状态检查逻辑
+			// 比如检查localStorage中的数据完整性
+		}
+		
+		// 页面加载完成后执行
+		document.addEventListener('DOMContentLoaded', function() {
+			checkPageStatus();
+			
+			// 添加卡片点击效果
+			document.querySelectorAll('.card').forEach(card => {
+				card.addEventListener('click', function(e) {
+					// 添加点击反馈
+					this.style.transform = 'scale(0.98)';
+					setTimeout(() => {
+						this.style.transform = '';
+					}, 150);
+				});
+			});
+		});
+	</script>
+</body>
+</html> 

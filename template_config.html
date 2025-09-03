@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>配置问题模板</title>
+	<style>
+		*{box-sizing:border-box}
+		body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','PingFang SC','Microsoft YaHei',sans-serif;color:#1f2937;background:#f7f7f8}
+		.header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 16px}
+		.header h1{margin:0;font-size:18px}
+		.container{padding:16px}
+		.toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px}
+		.btn{height:32px;padding:0 12px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer}
+		.btn.primary{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
+		.btn.danger{background:#ef4444;color:#fff;border-color:#ef4444}
+		.btn.ghost{background:#fff}
+		.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+		.table th,.table td{vertical-align:top;padding:10px;border-bottom:1px solid #f3f4f6;font-size:13px}
+		.table th{background:#f9fafb;color:#374151;text-align:left}
+		textarea{width:100%;min-height:100px;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:12px;border:1px solid #d1d5db;border-radius:6px;padding:8px;outline:none;background:#fff}
+		textarea.sql{min-height:140px}
+		.input{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;outline:none}
+		.row-actions{display:flex;gap:8px}
+		.note{color:#6b7280;font-size:12px;margin:8px 0}
+		.footer{padding:12px 0;display:flex;justify-content:space-between;gap:8px}
+		.kbd{font-family:ui-monospace,Consolas,monospace;border:1px solid #d1d5db;background:#fff;border-bottom-width:3px;border-radius:6px;padding:2px 6px;font-size:12px}
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h1>配置问题模板</h1>
+	</div>
+	<div class="container">
+		<div class="toolbar">
+			<div style="display:flex;gap:8px;align-items:center">
+				<button class="btn" onclick="addTemplate()">＋ 添加模板</button>
+				<button class="btn" onclick="importExamples()">导入示例</button>
+				<button class="btn" onclick="location.href='config_table.html'">构建配置表</button>
+				<button class="btn" onclick="location.href='model_management.html'">模型管理</button>
+			</div>
+			<div style="display:flex;gap:8px">
+				<button class="btn" onclick="back()">上一步</button>
+				<button class="btn primary" onclick="finish()">完成</button>
+			</div>
+		</div>
+
+		<p class="note">提示：模板SQL可使用变量占位符 <span class="kbd">#{varName}</span>。点击“提取变量”可自动生成参数骨架。</p>
+
+		<table class="table" id="tplTable">
+			<thead>
+				<tr>
+					<th style="width:22%">模板问题</th>
+					<th style="width:18%">模板描述</th>
+					<th style="width:30%">模板 SQL</th>
+					<th style="width:22%">模板参数(JSON)</th>
+					<th style="width:8%">操作</th>
+				</tr>
+			</thead>
+			<tbody id="tbody"></tbody>
+		</table>
+
+		<div class="footer">
+			<div class="note" id="dbMetaNote">已载入前置页面选择的表/字段，用于提示与变量校验。</div>
+			<div style="display:flex;gap:8px">
+				<button class="btn" onclick="back()">上一步</button>
+				<button class="btn primary" onclick="finish()">完成</button>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		const $ = sel => document.querySelector(sel);
+		const tbody = $('#tbody');
+		let templates = loadLocal() || [];
+		const payload = JSON.parse(localStorage.getItem('wireframe_payload')||'{}');
+		updateMetaNote();
+
+		function updateMetaNote(){
+			const tbl = payload.currentTable ? `当前表：${payload.currentTable}` : '尚未选择表';
+			const fields = (payload.fields||[]).map(f=>f.name).join(', ');
+			$('#dbMetaNote').textContent = `${tbl}；字段：${fields || '—'}`;
+		}
+
+		function render(){
+			tbody.innerHTML = '';
+			templates.forEach((t,i)=> tbody.appendChild(rowTpl(t,i)));
+		}
+
+		function rowTpl(t,i){
+			const tr = document.createElement('tr');
+			tr.innerHTML = `
+				<td><textarea placeholder="例如：查询课程名称为#{courseName}且状态为#{status}的课程有哪些？" oninput="bind(${i},'question',this.value)">${esc(t.question||'')}</textarea></td>
+				<td><textarea placeholder="模板用途或意图描述" oninput="bind(${i},'desc',this.value)">${esc(t.desc||'')}</textarea></td>
+				<td>
+					<textarea class="sql" placeholder="SELECT ... WHERE a=#{x} AND b IN (#{y})" oninput="bind(${i},'sql',this.value)">${esc(t.sql||'')}</textarea>
+					<div style="margin-top:6px;display:flex;gap:8px">
+						<button class="btn" onclick="extractVars(${i})">提取变量</button>
+						<button class="btn" onclick="formatSQL(${i})">格式化</button>
+					</div>
+				</td>
+				<td>
+					<textarea placeholder='[{"param_name":"# {var}","value":"示例","explanation":"含义"}]' oninput="bind(${i},'params',this.value)">${esc(t.params||'')}</textarea>
+					<div style="margin-top:6px;display:flex;gap:8px">
+						<button class="btn" onclick="validateJSON(${i})">校验JSON</button>
+					</div>
+				</td>
+				<td class="row-actions">
+					<button class="btn" onclick="cloneRow(${i})">复制</button>
+					<button class="btn danger" onclick="removeRow(${i})">删除</button>
+				</td>`;
+			return tr;
+		}
+
+		function bind(i,k,v){ templates[i][k]=v; saveLocal(); }
+		function addTemplate(){ templates.push({question:'',desc:'',sql:'',params:''}); render(); saveLocal(); }
+		function cloneRow(i){ templates.splice(i+1,0,JSON.parse(JSON.stringify(templates[i]))); render(); saveLocal(); }
+		function removeRow(i){ templates.splice(i,1); render(); saveLocal(); }
+		function importExamples(){
+			const ex=[
+				{question:'查询课程名称为#{courseName}授课状态为#{status}的课程',desc:'【课程名称】【授课状态】的课程有哪些？',sql:`SELECT course_name, course_time\nFROM courses\nWHERE course_name=#{courseName}\nAND status=#{status}`,params:`[{"table_name":"courses","param_info":[{"param_name":"# {courseName}","value":"数学","explanation":"课程名称"},{"param_name":"# {status}","value":"1","explanation":"授课状态：1/0"}]}]`},
+				{question:'查询年份为#{issueDate}年项目状态为#{projectStat}计划发布的国家标准有哪些？',desc:'【年份】【项目状态】计划发布的国标',sql:`SELECT DISTINCT planNum\nFROM std_plan\nWHERE projectStat=#{projectStat}\nAND DATE_FORMAT(issueDate,'%Y')=#{issueDate}`,params:`[{"table_name":"std_plan","param_info":[{"param_name":"# {issueDate}","value":"2020"},{"param_name":"# {projectStat}","value":"1","explanation":"在研/已发布"}]}]`}
+			];
+			templates = templates.concat(ex);
+			render(); saveLocal();
+		}
+		function exportJSON(){
+			const blob = new Blob([JSON.stringify(templates,null,2)],{type:'application/json'});
+			const a=document.createElement('a');
+			a.href=URL.createObjectURL(blob); a.download='question_templates.json'; a.click();
+		}
+		function saveLocal(){ localStorage.setItem('templates', JSON.stringify(templates)); }
+		function loadLocal(){ try{return JSON.parse(localStorage.getItem('templates')||'[]')}catch(e){return []} }
+		function validateJSON(i){
+			try{ JSON.parse(templates[i].params||'[]'); alert('JSON 校验通过'); }
+			catch(e){ alert('JSON 无效: '+e.message); }
+		}
+		function extractVars(i){
+			const sql = templates[i].sql||'';
+			const vars = Array.from(sql.matchAll(/#\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}/g)).map(m=>m[1]);
+			if(vars.length===0){ alert('未发现变量'); return; }
+			const param = vars.map(v=>({param_name:`# {${v}}`, value:'', explanation:`${v} 含义`}));
+			const table = payload.currentTable || '';
+			templates[i].params = JSON.stringify([{table_name:table,param_info:param}],null,2);
+			render(); saveLocal();
+		}
+		function formatSQL(i){
+			// 轻量格式化：每个关键字换行
+			const kw=['select','from','where','and','or','order by','group by','left join','inner join','outer join','limit'];
+			let s=templates[i].sql||''; let t=s;
+			kw.forEach(k=>{ const re=new RegExp('\\b'+k.replace(' ','\\s+')+'\\b','ig'); t=t.replace(re, m=>'\n'+m.toUpperCase()); });
+			templates[i].sql=t.trim(); render(); saveLocal();
+		}
+		function finish(){
+			saveLocal();
+			alert('已保存模板到 localStorage，键：templates。可继续接入后端保存。');
+		}
+		function back(){ history.back(); }
+		function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
+
+		render();
+	</script>
+</body>
+</html> 

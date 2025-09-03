@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>模型评测</title>
+	<style>
+		*{box-sizing:border-box}
+		body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','PingFang SC','Microsoft YaHei',sans-serif;color:#1f2937;background:#f7f7f8}
+		.header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 16px}
+		.header h1{margin:0;font-size:18px}
+		.container{padding:16px}
+		.toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap}
+		.btn{height:32px;padding:0 12px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer}
+		.btn.primary{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
+		.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+		.table th,.table td{vertical-align:top;padding:10px;border-bottom:1px solid #f3f4f6;font-size:13px}
+		.table th{background:#f9fafb;color:#374151;text-align:left}
+		textarea{width:100%;min-height:80px;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:12px;border:1px solid #d1d5db;border-radius:6px;padding:8px;outline:none;background:#fff}
+		.input{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;outline:none}
+		.note{color:#6b7280;font-size:12px;margin:8px 0}
+		.kpi{display:flex;gap:12px;margin-top:12px}
+		.kpi .card{flex:1;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px}
+		.card h3{margin:0 0 6px;font-size:14px}
+		.select{height:32px;border:1px solid #d1d5db;border-radius:6px;padding:0 8px;background:#fff}
+		.group{display:flex;align-items:center;gap:8px}
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h1>模型评测</h1>
+	</div>
+	<div class="container">
+		<div class="toolbar">
+			<div class="group">
+				<label class="note">测试集：</label>
+				<select id="setSelect" class="select" onchange="switchSet(this.value)"></select>
+				<button class="btn" onclick="addSet()">新增测试集</button>
+				<button class="btn" onclick="renameSet()">重命名</button>
+				<button class="btn" onclick="deleteSet()">删除</button>
+			</div>
+			<div class="group">
+				<button class="btn" onclick="addRow()">＋ 添加样本</button>
+				<button class="btn" onclick="importJSON()">导入JSON</button>
+				<button class="btn" onclick="exportJSON()">导出JSON</button>
+			</div>
+			<div class="group">
+				<label class="note">评测模式：</label>
+				<select id="mode" class="select">
+					<option value="exact">Exact-Match</option>
+					<option value="parser">Parser-Equivalence</option>
+					<option value="ai" selected>AI-Equivalence</option>
+				</select>
+				<button class="btn" onclick="history.back()">返回</button>
+			</div>
+		</div>
+
+		<div class="note">说明：支持为同一模型维护多个“测试集”。每个测试集内可编辑样本、导入/导出JSON。评测会针对当前选中的测试集执行。</div>
+
+		<table class="table">
+			<thead>
+				<tr>
+					<th style="width:28%">问题文本</th>
+					<th style="width:28%">期望SQL（SELECT）</th>
+					<th style="width:28%">生成SQL（新模型）</th>
+					<th style="width:8%">一致度</th>
+					<th style="width:8%">操作</th>
+				</tr>
+			</thead>
+			<tbody id="tbody"></tbody>
+		</table>
+
+		<div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+			<button class="btn primary" onclick="runEval()">运行评测</button>
+			<span id="evalInfo" class="note"></span>
+		</div>
+
+		<div class="kpi">
+			<div class="card"><h3>样本数</h3><div id="k_total">0</div></div>
+			<div class="card"><h3>Semantic-Match</h3><div id="k_exact">0%</div></div>
+			<div class="card"><h3>可执行率</h3><div id="k_exec">100%</div></div>
+			<div class="card"><h3>平均生成时延</h3><div id="k_latency">-</div></div>
+		</div>
+	</div>
+
+	<script>
+		const tbody = document.getElementById('tbody');
+		const url = new URL(location.href);
+		const modelId = url.searchParams.get('model_id') || 'unknown_model';
+		document.title = `模型评测 - ${modelId}`;
+
+		// 数据结构：sets = { id1: {name:'默认', samples:[...]}, ...}, activeSetId
+		let sets = loadSets();
+		let activeSetId = loadActiveSetId();
+		if(!sets || Object.keys(sets).length===0){
+			const id = newSetId();
+			sets = {[id]: {name:'默认测试集', samples:[]}};
+			activeSetId = id; persist();
+		}
+		if(!sets[activeSetId]) activeSetId = Object.keys(sets)[0];
+
+		function currentSamples(){ return sets[activeSetId].samples; }
+		function setCurrentSamples(v){ sets[activeSetId].samples = v; persist(); }
+
+		function fillSetSelect(){
+			const sel = document.getElementById('setSelect');
+			sel.innerHTML='';
+			Object.entries(sets).forEach(([id,obj])=>{
+				const opt=document.createElement('option');
+				opt.value=id; opt.textContent=obj.name; if(id===activeSetId) opt.selected=true; sel.appendChild(opt);
+			});
+		}
+
+		function render(){
+			fillSetSelect();
+			tbody.innerHTML='';
+			currentSamples().forEach((s,i)=> tbody.appendChild(rowTpl(s,i)));
+			updateKPIs();
+		}
+
+		function rowTpl(s,i){
+			const tr = document.createElement('tr');
+			tr.innerHTML = `
+				<td><textarea placeholder="请输入自然语言问题" oninput="bind(${i},'q',this.value)">${esc(s.q||'')}</textarea></td>
+				<td><textarea placeholder="请输入期望SQL（仅SELECT）" oninput="bind(${i},'gold',this.value)">${esc(s.gold||'')}</textarea></td>
+				<td><textarea placeholder="点击运行后自动生成" readonly>${esc(s.pred||'')}</textarea></td>
+				<td><input class="input" style="width:72px" value="${s.score??''}" readonly></td>
+				<td>
+					<button class="btn" onclick="dup(${i})">复制</button>
+					<button class="btn" onclick="del(${i})">删除</button>
+				</td>`;
+			return tr;
+		}
+
+		function addRow(){ const arr=currentSamples(); arr.push({q:'',gold:'',pred:'',score:''}); persist(); render(); }
+		function dup(i){ const arr=currentSamples(); arr.splice(i+1,0,JSON.parse(JSON.stringify(arr[i]))); persist(); render(); }
+		function del(i){ const arr=currentSamples(); arr.splice(i,1); persist(); render(); }
+		function bind(i,k,v){ const arr=currentSamples(); arr[i][k]=v; persist(); }
+
+		function addSet(){ const name = prompt('输入测试集名称','新测试集'); if(!name) return; const id=newSetId(); sets[id]={name,samples:[]}; activeSetId=id; persist(); render(); }
+		function renameSet(){ const cur = sets[activeSetId]; if(!cur) return; const name=prompt('重命名测试集',cur.name); if(!name) return; cur.name=name; persist(); render(); }
+		function deleteSet(){ if(Object.keys(sets).length===1){ alert('至少保留一个测试集'); return; } if(!confirm('确定删除当前测试集吗？')) return; delete sets[activeSetId]; activeSetId=Object.keys(sets)[0]; persist(); render(); }
+		function switchSet(id){ if(!sets[id]) return; activeSetId=id; persist(); render(); }
+
+		function importJSON(){
+			const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
+			inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{const data=JSON.parse(r.result); if(Array.isArray(data)){ sets[activeSetId].samples=data; persist(); render(); } }catch(err){ alert('JSON 解析失败'); } }; r.readAsText(f); };
+			inp.click();
+		}
+		function exportJSON(){ const arr=currentSamples(); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(arr,null,2)],{type:'application/json'})); a.download=`eval_${modelId}_${sets[activeSetId].name}.json`; a.click(); }
+
+		async function runEval(){
+			const samples = currentSamples();
+			if(samples.length===0){ alert('请先添加样本'); return; }
+			const mode = document.getElementById('mode').value;
+			let pass=0; const latency=[];
+			for(let i=0;i<samples.length;i++){
+				const s=samples[i];
+				const t1=performance.now();
+				const pred = mockGenerateSQL(s.q);
+				s.pred = pred;
+				const score = await judgeEquivalence(pred, s.gold, mode);
+				s.score = Number.isFinite(score)? score.toFixed(2): '';
+				latency.push(performance.now()-t1);
+				if((score||0) >= 0.5) pass++;
+			}
+			persist(); render();
+			document.getElementById('k_total').textContent = samples.length;
+			document.getElementById('k_exact').textContent = ((pass/samples.length)*100).toFixed(1)+'%';
+			document.getElementById('k_exec').textContent = '100%';
+			document.getElementById('k_latency').textContent = (latency.reduce((a,b)=>a+b,0)/latency.length).toFixed(0)+' ms';
+			document.getElementById('evalInfo').textContent = `评测完成（模型：${modelId}，测试集：${sets[activeSetId].name}，模式：${mode}）`;
+		}
+
+		// === 等价性 ===（沿用之前实现）
+		async function judgeEquivalence(a,b,mode){
+			if(!a||!b) return 0;
+			if(mode==='exact') return norm(a)===norm(b)?1:0;
+			if(mode==='parser') return parserEquivalence(a,b);
+			if(mode==='ai'){
+				if(typeof window.aiJudgeSqlEquivalence==='function'){
+					try{ const r = await window.aiJudgeSqlEquivalence(a,b); return clamp01(r&&typeof r.score==='number'? r.score : (r?1:0)); }catch(e){ return parserEquivalence(a,b); }
+				}
+				return parserEquivalence(a,b);
+			}
+			return 0;
+		}
+		function parserEquivalence(a,b){
+			try{
+				const pa = liteParse(a), pb = liteParse(b);
+				if(pa.table!==pb.table) return 0;
+				const colsMatch = setEq(new Set(pa.cols), new Set(pb.cols));
+				const whereIncl = pa.where && pb.where ? (pa.where.includes(pb.where)||pb.where.includes(pa.where)) : true;
+				return (colsMatch && whereIncl) ? 0.8 : 0.2;
+			}catch(e){ return norm(a).includes(norm(b))||norm(b).includes(norm(a))?0.6:0; }
+		}
+		function liteParse(sql){
+			const s = norm(sql);
+			const mFrom = s.match(/from\s+([a-z0-9_\.]+)/);
+			const table = mFrom? mFrom[1] : '';
+			const mSel = s.match(/select\s+(.+?)\s+from/);
+			const cols = (mSel? mSel[1]: '*').split(',').map(x=>x.trim()).filter(Boolean);
+			const mWhere = s.match(/where\s+(.+?)(\s+group|\s+order|\s+limit|$)/);
+			const where = mWhere? mWhere[1] : '';
+			return { table, cols, where };
+		}
+		function setEq(a,b){ if(a.size!==b.size) return false; for(const v of a){ if(!b.has(v)) return false; } return true; }
+		function norm(s){ return (s||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+		function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+
+		function mockGenerateSQL(q){
+			if(/课程|course/.test(q)) return 'SELECT course_name FROM courses WHERE status = 1';
+			if(/学生|student/.test(q)) return 'SELECT * FROM students LIMIT 100';
+			return 'SELECT 1';
+		}
+		function updateKPIs(){ document.getElementById('k_total').textContent = currentSamples().length; }
+		function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
+
+		// === 持久化（多测试集） ===
+		function newSetId(){ return 'set_'+Math.random().toString(36).slice(2,8); }
+		function persist(){ localStorage.setItem('eval_sets_'+modelId, JSON.stringify(sets)); localStorage.setItem('eval_sets_active_'+modelId, activeSetId); }
+		function loadSets(){ try{ return JSON.parse(localStorage.getItem('eval_sets_'+modelId)||'{}'); }catch(e){ return {}; } }
+		function loadActiveSetId(){ return localStorage.getItem('eval_sets_active_'+modelId)||''; }
+
+		render();
+	</script>
+</body>
+</html> 

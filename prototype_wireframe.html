@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>表选择与字段配置</title>
+	<style>
+		* { box-sizing: border-box; }
+		body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif; color: #1f2937; }
+		.header { padding: 16px 20px; background: #fff; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 10; }
+		.header h1 { margin: 0; font-size: 18px; }
+		.container { display: grid; grid-template-columns: 320px 1fr; gap: 0; min-height: calc(100vh - 56px); }
+		.sidebar { border-right: 1px solid #e5e7eb; background: #fafafa; padding: 16px; }
+		.main { padding: 16px; }
+		.section-title { font-weight: 600; margin: 8px 0 12px; font-size: 14px; color: #111827; }
+		.search { position: relative; margin-bottom: 10px; }
+		.search input { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; outline: none; }
+		.table-list { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; overflow: hidden; }
+		.table-list-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+		.table-list-body { max-height: 360px; overflow: auto; }
+		.table-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #f3f4f6; cursor: pointer; }
+		.table-item:hover { background: #f9fafb; }
+		.badge { background: #eef2ff; color: #3730a3; font-size: 12px; padding: 2px 6px; border-radius: 999px; }
+		.btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; }
+		.btn.primary { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+		.btn.ghost { background: #fff; }
+		.btn + .btn { margin-left: 8px; }
+		.toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+		.toolbar-left { display: flex; gap: 8px; align-items: center; }
+		.table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+		.table th, .table td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; font-size: 13px; vertical-align: top; }
+		.table th { background: #f9fafb; text-align: left; color: #374151; position: sticky; top: 56px; z-index: 5; }
+		.table tr:hover td { background: #fcfcfd; }
+		.kv { color: #6b7280; font-size: 12px; }
+		.input { width: 100%; padding: 6px 8px; font-size: 13px; border: 1px solid #d1d5db; border-radius: 6px; outline: none; background: #fff; }
+		.input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.16); }
+		.helper { color: #6b7280; font-size: 12px; margin: 8px 0 16px; }
+		.footer { padding: 12px 0; display: flex; justify-content: flex-end; gap: 8px; }
+		.empty { padding: 36px; text-align: center; color: #6b7280; }
+		.note { color:#6b7280; font-size:12px; margin:8px 0; }
+		.modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+		.modal-content { background: #fff; border-radius: 8px; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+		.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+		.modal-title { font-size: 16px; font-weight: 600; margin: 0; }
+		.modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #6b7280; }
+		.form-group { margin-bottom: 16px; }
+		.form-label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; }
+		.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+		.progress { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+		.progress-bar { height: 100%; background: #0ea5e9; transition: width 0.3s; }
+		.status { padding: 8px 12px; border-radius: 6px; margin: 8px 0; font-size: 13px; }
+		.status.success { background: #dcfce7; color: #166534; }
+		.status.error { background: #fee2e2; color: #991b1b; }
+		.status.info { background: #dbeafe; color: #1e3a8a; }
+		.agent-info { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px; margin-bottom: 16px; }
+		.agent-info h3 { margin: 0 0 8px; font-size: 14px; color: #0369a1; }
+		.agent-info p { margin: 4px 0; font-size: 12px; color: #0c4a6e; }
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h1>表选择与字段配置</h1>
+	</div>
+	<div class="container">
+		<aside class="sidebar">
+			<div class="section-title">数据库表名</div>
+			<div class="search">
+				<input id="searchInput" type="text" placeholder="搜索表名..." oninput="renderTableList()" />
+			</div>
+			<div class="table-list">
+				<div class="table-list-header">
+					<label><input type="checkbox" id="checkAll" onchange="toggleAll(this.checked)" /> 全选</label>
+					<span class="badge" id="selectedCount">已选 0</span>
+				</div>
+				<div class="table-list-body" id="tableList"></div>
+			</div>
+			<p class="helper">支持多选、全选。选择后右侧展示表字段；可为字段补充"字段注释"，并一键生成"AI注释"。</p>
+		</aside>
+		<main class="main">
+			<!-- 智能体信息展示区域 -->
+
+
+			<div class="toolbar">
+				<div class="toolbar-left">
+					<button class="btn ghost" onclick="refreshData()">刷新数据</button>
+					<button class="btn" onclick="clearSelection()">清空选择</button>
+					<button class="btn" onclick="showMigrationModal()">抽样并迁移数据</button>
+				</div>
+				<div>
+					<button class="btn" onclick="bulkAIAnnotate()">为当前表全部字段生成 AI 注释</button>
+					<button class="btn primary" onclick="nextStep()">下一步</button>
+				</div>
+			</div>
+
+			<div id="fieldsPanel" class="fields-panel"></div>
+			<p class="note">提示：点击"抽样并迁移数据"后，会从源数据库抽样数据并迁移到目标数据库，同时展示每个字段的不同值数量与3条样例值。</p>
+			<div class="footer">
+				<button class="btn" onclick="prevStep()">上一步</button>
+				<button class="btn primary" onclick="nextStep()">下一步</button>
+			</div>
+		</main>
+	</div>
+
+	<!-- 数据迁移配置模态框 -->
+	<div id="migrationModal" class="modal">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h3 class="modal-title">数据抽样与迁移配置</h3>
+				<button class="modal-close" onclick="hideMigrationModal()">&times;</button>
+			</div>
+			
+			<div class="form-group">
+				<label class="form-label">源数据库配置</label>
+				<div class="form-row">
+					<input type="text" id="sourceHost" class="input" placeholder="主机地址" value="192.168.9.169" />
+					<input type="number" id="sourcePort" class="input" placeholder="端口" value="3306" />
+				</div>
+
+				<input type="text" id="sourceDatabase" class="input" placeholder="数据库名" value="yearning" />
+			</div>
+
+			<div class="form-group">
+				<label class="form-label">目标数据库配置</label>
+				<div class="form-row">
+					<input type="text" id="targetHost" class="input" placeholder="主机地址" value="192.168.9.170" />
+					<input type="number" id="targetPort" class="input" placeholder="端口" value="3306" />
+				</div>
+
+				<input type="text" id="targetDatabase" class="input" placeholder="数据库名" value="yearning_dev" />
+			</div>
+
+			<div class="form-group">
+				<label class="form-label">迁移参数</label>
+				<div class="form-row">
+					<input type="number" id="sampleLimit" class="input" placeholder="抽样数量" value="100" />
+					<input type="number" id="batchSize" class="input" placeholder="批次大小" value="1000" />
+				</div>
+				<label style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+					<input type="checkbox" id="skipExisting" checked />
+					<span>跳过重复数据</span>
+				</label>
+			</div>
+
+			<div id="migrationStatus" style="display: none;">
+				<div class="progress">
+					<div id="progressBar" class="progress-bar" style="width: 0%"></div>
+				</div>
+				<div id="statusText" class="status info">准备开始迁移...</div>
+			</div>
+
+			<div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
+				<button class="btn" onclick="hideMigrationModal()">取消</button>
+				<button class="btn primary" onclick="startMigration()">开始迁移</button>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		// 读取新建智能体页面的数据
+		let agentData = null;
+		
+		function loadAgentData() {
+			try {
+				const data = localStorage.getItem('agent_form_data');
+				if (data) {
+					agentData = JSON.parse(data);
+					displayAgentInfo();
+					// 根据数据服务类型更新配置
+					updateDBConfig(agentData.dataServiceType);
+				}
+			} catch (e) {
+				console.error('加载智能体数据失败:', e);
+			}
+		}
+		
+		function displayAgentInfo() {
+			if (!agentData) return;
+			
+			const infoDiv = document.getElementById('agentInfo');
+			const contentDiv = document.getElementById('agentInfoContent');
+			
+			contentDiv.innerHTML = `
+				<p><strong>名称:</strong> ${agentData.agentName}</p>
+				<p><strong>环境:</strong> ${agentData.environment}</p>
+				<p><strong>单元:</strong> ${agentData.unit}</p>
+				<p><strong>数据库:</strong> ${agentData.databaseName}</p>
+				<p><strong>数据服务类型:</strong> ${agentData.dataServiceType}</p>
+				<p><strong>已选表:</strong> ${agentData.selectedTables.join(', ')}</p>
+				<p><strong>业务描述:</strong> ${agentData.businessDescription}</p>
+			`;
+			
+			infoDiv.style.display = 'block';
+		}
+		
+		function updateDBConfig(dbType) {
+			const configs = {
+				'mysql': { port: 3306, user: 'root' },
+				'oceanbase': { port: 2881, user: 'root' },
+				'postgresql': { port: 5432, user: 'postgres' },
+				'oracle': { port: 1521, user: 'system' },
+				'sqlserver': { port: 1433, user: 'sa' },
+				'lidbview': { port: 8080, user: 'admin' }
+			};
+			
+			const config = configs[dbType] || configs['mysql'];
+			if (document.getElementById('sourcePort')) {
+				document.getElementById('sourcePort').value = config.port;
+				document.getElementById('sourceUser').value = config.user;
+			}
+			if (document.getElementById('targetPort')) {
+				document.getElementById('targetPort').value = config.port;
+				document.getElementById('targetUser').value = config.user;
+			}
+		}
+
+		// --- 模拟元数据（可替换为真实接口返回） ---
+		const schema = {
+			"db_mysql": {
+				"store_net.access_tokens": [
+					{ name: "id", type: "BIGINT", nullable: false, comment: "主键ID" },
+					{ name: "created_at", type: "DATETIME", nullable: true, comment: "创建时间" },
+					{ name: "updated_at", type: "DATETIME", nullable: true, comment: "更新时间" },
+					{ name: "deleted_at", type: "DATETIME", nullable: true, comment: "删除时间" },
+					{ name: "skey", type: "VARCHAR", nullable: false, comment: "会话Key" },
+					{ name: "atoken", type: "VARCHAR", nullable: false, comment: "访问Token" },
+					{ name: "atoken_expire", type: "DATETIME", nullable: false, comment: "Token过期时间" }
+				],
+				"store_net.apps": [
+					{ name: "id", type: "BIGINT", nullable: false, comment: "主键ID" },
+					{ name: "name", type: "VARCHAR", nullable: false, comment: "应用名称" },
+					{ name: "status", type: "TINYINT", nullable: false, comment: "状态" },
+					{ name: "created_at", type: "DATETIME", nullable: true, comment: "创建时间" },
+					{ name: "updated_at", type: "DATETIME", nullable: true, comment: "更新时间" }
+				],
+				"store_net.refresh_tokens": [
+					{ name: "id", type: "BIGINT", nullable: false, comment: "主键ID" },
+					{ name: "user_id", type: "BIGINT", nullable: false, comment: "用户ID" },
+					{ name: "rtoken", type: "VARCHAR", nullable: false, comment: "刷新Token" },
+					{ name: "rtoken_expire", type: "DATETIME", nullable: false, comment: "刷新过期时间" }
+				]
+			}
+		};
+
+		let allTables = Object.keys(schema.db_mysql);
+		let selectedTables = new Set();
+		let currentTable = null;
+		const sampleCache = {}; // { [table]: { distinctCount: {col:n}, samples: {col:[v1,v2,v3]} } }
+
+		function renderTableList() {
+			const keyword = (document.getElementById('searchInput').value || '').toLowerCase();
+			const list = document.getElementById('tableList');
+			list.innerHTML = '';
+			const filtered = allTables.filter(t => t.toLowerCase().includes(keyword));
+			filtered.forEach(tbl => {
+				const row = document.createElement('div');
+				row.className = 'table-item';
+				row.onclick = (e) => {
+					if (e.target && e.target.type === 'checkbox') return;
+					selectTable(tbl);
+				};
+				const cb = document.createElement('input');
+				cb.type = 'checkbox';
+				cb.checked = selectedTables.has(tbl);
+				cb.onchange = () => toggleTable(tbl, cb.checked);
+				const span = document.createElement('span');
+				span.textContent = tbl;
+				row.appendChild(cb);
+				row.appendChild(span);
+				list.appendChild(row);
+			});
+			updateSelectedCount();
+			document.getElementById('checkAll').checked = filtered.length>0 && filtered.every(t => selectedTables.has(t));
+		}
+
+		function toggleAll(checked) {
+			const keyword = (document.getElementById('searchInput').value || '').toLowerCase();
+			const filtered = allTables.filter(t => t.toLowerCase().includes(keyword));
+			filtered.forEach(t => checked ? selectedTables.add(t) : selectedTables.delete(t));
+			renderTableList();
+		}
+
+		function toggleTable(tbl, checked) {
+			if (checked) selectedTables.add(tbl); else selectedTables.delete(tbl);
+			updateSelectedCount();
+		}
+
+		function updateSelectedCount() {
+			document.getElementById('selectedCount').textContent = `已选 ${selectedTables.size}`;
+		}
+
+		function selectTable(tbl) {
+			currentTable = tbl;
+			selectedTables.add(tbl);
+			renderTableList();
+			renderFields(tbl);
+		}
+
+		function renderFields(tbl) {
+			const panel = document.getElementById('fieldsPanel');
+			if (!tbl) { panel.innerHTML = '<div class="empty">请选择左侧表名以查看字段</div>'; return; }
+			const fields = schema.db_mysql[tbl] || [];
+			let html = '';
+			html += `<div class="section-title">字段（${tbl}）</div>`;
+			// 表注释编辑区
+			html += `
+				<div style="display:flex; gap:12px; align-items:flex-start; margin:8px 0 12px">
+					<div style="flex:1">
+						<label class="kv">表注释</label>
+						<input id="tableComment" class="input" placeholder="请输入该表的人类可读说明（用途、主键、重要字段等）" />
+					</div>
+					<div style="flex:1">
+						<label class="kv">AI表注释</label>
+						<div style="display:flex; gap:8px; align-items:center">
+							<input id="tableAIComment" class="input" placeholder="AI注释（点击🧠生成）" />
+							<button class="btn" onclick="aiAnnotateTable('${tbl}')">🧠 生成</button>
+						</div>
+					</div>
+				</div>
+			`;
+			html += `<table class="table"><thead><tr>
+				<th style="width:40px;"><input type="checkbox" id="checkAllCols" onchange="toggleAllCols(this.checked)" /></th>
+				<th>源表字段</th>
+				<th>源表字段类型</th>
+				<th>能否为NULL</th>
+
+				<th>字段注释</th>
+				<th>AI注释</th>
+			</tr></thead><tbody id="tbodyFields"></tbody></table>`;
+			panel.innerHTML = html;
+
+			const tbody = document.getElementById('tbodyFields');
+			const analysis = sampleCache[tbl] || { distinctCount:{}, samples:{} };
+			fields.forEach((f, idx) => {
+				const tr = document.createElement('tr');
+				const cnt = analysis.distinctCount[f.name] ?? '-';
+				const sam = (analysis.samples[f.name] || []).slice(0,3).map(v => escapeHTML(String(v))).join(' | ');
+				tr.innerHTML = `
+					<td><input type="checkbox" class="col-check" checked /></td>
+					<td><div>${f.name}${idx===0? ' <span class="kv">🔑</span>': ''}</div></td>
+					<td>${f.type}</td>
+					<td>${f.nullable ? 'YES' : 'NO'}</td>
+
+					<td><input class="input" data-role="comment" value="${f.comment || ''}" placeholder="请输入字段注释" / disabled></td>
+					<td>
+						<div style="display:flex; gap:8px; align-items:center;">
+							<input class="input" data-role="ai" placeholder="AI注释（点击🧠生成）" />
+							<button class="btn" onclick="aiAnnotateRow(this, '${f.name}', '${f.type}')">🧠 生成</button>
+						</div>
+					</td>`;
+				tbody.appendChild(tr);
+			});
+		}
+
+		function toggleAllCols(checked) {
+			document.querySelectorAll('.col-check').forEach(cb => cb.checked = checked);
+		}
+
+		function heuristicAI(name, type) {
+			const n = name.toLowerCase();
+			if (/(^id$|_id$)/.test(n)) return '主键/外键标识';
+			if (/name|title/.test(n)) return '名称/标题';
+			if (/created_at|create_time|gmt_create/.test(n)) return '创建时间';
+			if (/updated_at|update_time|gmt_modified/.test(n)) return '更新时间';
+			if (/deleted_at|is_delete|is_deleted/.test(n)) return '删除标识/删除时间';
+			if (/status|state/.test(n)) return '状态码/状态标识';
+			if (/token/.test(n)) return '令牌/凭证';
+			if (/expire|expired|ttl/.test(n)) return '过期时间/有效期';
+			if (/user/.test(n)) return '用户相关标识';
+			if (/key|skey/.test(n)) return '秘钥/会话Key';
+			if (/cnt|count|total/.test(n)) return '计数/统计值';
+			if (/price|amount|fee/.test(n)) return '金额/费用';
+			if (/ip/.test(n)) return 'IP地址';
+			return `${name} 字段含义（${type}）`;
+		}
+
+		function aiAnnotateRow(btn, name, type) {
+			const wrap = btn.closest('td');
+			const input = wrap.querySelector('input[data-role="ai"]');
+			input.value = heuristicAI(name, type);
+		}
+
+		function aiAnnotateTable(tbl){
+			const input = document.getElementById('tableAIComment');
+			input.value = heuristicTableAI(tbl);
+		}
+
+		function heuristicTableAI(tbl){
+			const t = tbl.toLowerCase();
+			if(/access_token|access_tokens/.test(t)) return '访问令牌信息表：存储会话Key、访问Token及其过期时间等';
+			if(/refresh_token|refresh_tokens/.test(t)) return '刷新令牌信息表：存储用户刷新Token及过期时间';
+			if(/app|apps/.test(t)) return '应用信息表：存储应用基础信息、状态与时间戳';
+			return `${tbl} 表的业务说明、主键与核心字段用途`;
+		}
+
+		function bulkAIAnnotate() {
+			if (!currentTable) return;
+			document.querySelectorAll('input[data-role="ai"]').forEach((el, idx) => {
+				const row = el.closest('tr');
+				const cols = row.querySelectorAll('td');
+				const name = cols[1].innerText.trim().split(' ')[0];
+				const type = cols[2].innerText.trim();
+				el.value = heuristicAI(name, type);
+			});
+			const tAI = document.getElementById('tableAIComment');
+			if(tAI) tAI.value = heuristicTableAI(currentTable);
+		}
+
+		function refreshData() {
+			renderTableList();
+			if (currentTable) renderFields(currentTable); else document.getElementById('fieldsPanel').innerHTML = '<div class="empty">请选择左侧表名以查看字段</div>';
+		}
+
+		function clearSelection() {
+			selectedTables.clear();
+			currentTable = null;
+			renderTableList();
+			refreshData();
+		}
+
+		function prevStep() { 
+			// 返回新建智能体页面
+			window.location.href = 'create_agent.html';
+		}
+		
+		function nextStep() { 
+			const payload = collectPayload();
+			localStorage.setItem('wireframe_payload', JSON.stringify(payload));
+			location.href = 'template_config.html';
+		}
+
+		function collectPayload() {
+			const selected = Array.from(selectedTables);
+			let fields = [];
+			if (currentTable) {
+				document.querySelectorAll('#tbodyFields tr').forEach(tr => {
+					const tds = tr.querySelectorAll('td');
+					const chosen = tr.querySelector('.col-check').checked;
+					if (!chosen) return;
+					fields.push({
+						name: tds[1].innerText.trim().split(' ')[0],
+						type: tds[2].innerText.trim(),
+						nullable: tds[3].innerText.trim(),
+						distinctCount: tds[4].innerText.trim(),
+						samples: tds[5].innerText.trim(),
+						comment: tr.querySelector('input[data-role="comment"]').value.trim(),
+						ai_comment: tr.querySelector('input[data-role="ai"]').value.trim()
+					});
+				});
+			}
+			const table_comment = (document.getElementById('tableComment')||{}).value || '';
+			const table_ai_comment = (document.getElementById('tableAIComment')||{}).value || '';
+			return { 
+				agentData: agentData,
+				db: 'db_mysql', 
+				selectedTables: selected, 
+				currentTable, 
+				table_comment, 
+				table_ai_comment, 
+				fields 
+			};
+		}
+
+		// ====== 数据迁移相关功能 ======
+		function showMigrationModal() {
+			if (!currentTable) { alert('请先选择要迁移的表'); return; }
+			document.getElementById('migrationModal').style.display = 'flex';
+		}
+
+		function hideMigrationModal() {
+			document.getElementById('migrationModal').style.display = 'none';
+			document.getElementById('migrationStatus').style.display = 'none';
+		}
+
+		async function startMigration() {
+			const statusDiv = document.getElementById('migrationStatus');
+			const progressBar = document.getElementById('progressBar');
+			const statusText = document.getElementById('statusText');
+			
+			statusDiv.style.display = 'block';
+			
+			// 获取配置
+			const sourceConfig = {
+				host: document.getElementById('sourceHost').value,
+				port: parseInt(document.getElementById('sourcePort').value),
+				user: document.getElementById('sourceUser').value,
+				password: document.getElementById('sourcePassword').value,
+				database: document.getElementById('sourceDatabase').value
+			};
+			
+			const targetConfig = {
+				host: document.getElementById('targetHost').value,
+				port: parseInt(document.getElementById('targetPort').value),
+				user: document.getElementById('targetUser').value,
+				password: document.getElementById('targetPassword').value,
+				database: document.getElementById('targetDatabase').value
+			};
+			
+			const sampleLimit = parseInt(document.getElementById('sampleLimit').value);
+			const batchSize = parseInt(document.getElementById('batchSize').value);
+			const skipExisting = document.getElementById('skipExisting').checked;
+			
+			try {
+				// 更新状态
+				progressBar.style.width = '20%';
+				statusText.className = 'status info';
+				statusText.textContent = '正在连接源数据库...';
+				
+				// 调用后端迁移接口
+				const migrationResult = await callMigrationAPI({
+					action: 'sample_and_migrate',
+					table_name: currentTable,
+					limit: sampleLimit,
+					batch_size: batchSize,
+					skip_existing: skipExisting,
+					source_config: sourceConfig,
+					target_config: targetConfig
+				});
+				
+				if (migrationResult.success) {
+					progressBar.style.width = '100%';
+					statusText.className = 'status success';
+					statusText.textContent = `迁移完成！抽样 ${migrationResult.sample_result.sample_count} 条记录，成功迁移 ${migrationResult.migrate_result.migrated_count} 条记录`;
+					
+					// 更新字段分析数据
+					await updateFieldAnalysis(currentTable);
+					
+				} else {
+					statusText.className = 'status error';
+					statusText.textContent = `迁移失败: ${migrationResult.error}`;
+				}
+				
+			} catch (error) {
+				statusText.className = 'status error';
+				statusText.textContent = `迁移失败: ${error.message}`;
+			}
+		}
+
+		// 调用后端迁移API（可替换为真实接口）
+		async function callMigrationAPI(params) {
+			// 模拟API调用延迟
+			await new Promise(resolve => setTimeout(resolve, 2000));
+			
+			// 这里应该调用真实的后端API
+			// 示例：return await fetch('/api/migration', { method: 'POST', body: JSON.stringify(params) });
+			
+			// 模拟返回结果
+			return {
+				success: true,
+				sample_result: {
+					success: true,
+					table_name: params.table_name,
+					sample_count: params.limit,
+					data: generateMockData(params.table_name, params.limit),
+					create_table_sql: `CREATE TABLE ${params.table_name} (...)`
+				},
+				migrate_result: {
+					success: true,
+					message: '数据迁移完成',
+					migrated_count: params.limit,
+					total_count: params.limit,
+					table_name: params.table_name
+				}
+			};
+		}
+
+		// 更新字段分析数据
+		async function updateFieldAnalysis(tableName) {
+			try {
+				// 调用分析API
+				const analysisResult = await callAnalysisAPI(tableName);
+				if (analysisResult.success) {
+					sampleCache[tableName] = {
+						distinctCount: {},
+						samples: {}
+					};
+					
+					// 更新缓存
+					Object.entries(analysisResult.analysis.columns).forEach(([colName, colData]) => {
+						sampleCache[tableName].distinctCount[colName] = colData.distinct_count;
+						sampleCache[tableName].samples[colName] = colData.sample_values;
+					});
+					
+					// 重新渲染字段
+					renderFields(tableName);
+				}
+			} catch (error) {
+				console.error('更新字段分析失败:', error);
+			}
+		}
+
+		// 调用分析API（可替换为真实接口）
+		async function callAnalysisAPI(tableName) {
+			// 模拟API调用
+			await new Promise(resolve => setTimeout(resolve, 1000));
+			
+			// 模拟返回分析结果
+			const fields = schema.db_mysql[tableName] || [];
+			const columns = {};
+			
+			fields.forEach(field => {
+				columns[field.name] = {
+					type: field.type,
+					distinct_count: Math.floor(Math.random() * 100) + 1,
+					sample_values: generateSampleValues(field.name, field.type)
+				};
+			});
+			
+			return {
+				success: true,
+				analysis: {
+					table_name: tableName,
+					columns: columns,
+					sample_count: 100
+				}
+			};
+		}
+
+		// 生成模拟数据
+		function generateMockData(tableName, limit) {
+			const fields = schema.db_mysql[tableName] || [];
+			const data = [];
+			
+			for (let i = 0; i < limit; i++) {
+				const row = {};
+				fields.forEach(field => {
+					row[field.name] = generateSampleValue(field.name, field.type, i);
+				});
+				data.push(row);
+			}
+			
+			return data;
+		}
+
+		// 生成样例值
+		function generateSampleValues(fieldName, fieldType) {
+			const values = [];
+			for (let i = 0; i < 3; i++) {
+				values.push(generateSampleValue(fieldName, fieldType, i));
+			}
+			return values;
+		}
+
+		// 生成单个样例值
+		function generateSampleValue(fieldName, fieldType, index) {
+			const name = fieldName.toLowerCase();
+			
+			if (/id$/.test(name)) return index + 1;
+			if (/name/.test(name)) return `name_${index % 7}`;
+			if (/status/.test(name)) return ['0', '1', '2'][index % 3];
+			if (/token/.test(name)) return `tok_${Math.random().toString(36).slice(2, 8)}`;
+			if (/created_at|updated_at|deleted_at|expire/.test(name)) {
+				return new Date(Date.now() - (index % 10) * 86400000).toISOString();
+			}
+			
+			return `v_${index % 9}`;
+		}
+
+		function escapeHTML(s) { return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch])); }
+
+		// 初始化页面
+		document.addEventListener('DOMContentLoaded', function() {
+			// 加载智能体数据
+			loadAgentData();
+			
+			// 初始渲染
+			renderTableList();
+			refreshData();
+		});
+	</script>
+</body>
+</html> 

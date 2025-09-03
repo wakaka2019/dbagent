@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>新建智能体</title>
+	<style>
+		* { box-sizing: border-box; }
+		body { 
+			margin: 0; 
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif; 
+			color: #1f2937; 
+			background: #f7f7f8; 
+		}
+		.header { 
+			padding: 16px 20px; 
+			background: #fff; 
+			border-bottom: 1px solid #e5e7eb; 
+			position: sticky; 
+			top: 0; 
+			z-index: 10; 
+			display: flex; 
+			justify-content: space-between; 
+			align-items: center;
+		}
+		.header h1 { margin: 0; font-size: 18px; }
+		.container { 
+			padding: 16px; 
+			max-width: 800px; 
+			margin: 0 auto; 
+		}
+		.form-card { 
+			background: #fff; 
+			border-radius: 8px; 
+			padding: 24px; 
+			box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+		}
+		.section-title { 
+			font-weight: 600; 
+			margin: 0 0 8px; 
+			font-size: 16px; 
+			color: #111827; 
+		}
+		.section-subtitle { 
+			color: #6b7280; 
+			font-size: 14px; 
+			margin-bottom: 24px; 
+		}
+		.form-group { 
+			margin-bottom: 20px; 
+		}
+		.form-row { 
+			display: grid; 
+			grid-template-columns: 1fr 1fr; 
+			gap: 16px; 
+		}
+		.form-label { 
+			display: block; 
+			margin-bottom: 6px; 
+			font-size: 14px; 
+			font-weight: 500; 
+			color: #374151; 
+		}
+		.required { 
+			color: #dc2626; 
+			margin-left: 4px; 
+		}
+		.help-icon { 
+			display: inline-block; 
+			width: 16px; 
+			height: 16px; 
+			background: #9ca3af; 
+			color: #fff; 
+			border-radius: 50%; 
+			text-align: center; 
+			line-height: 16px; 
+			font-size: 12px; 
+			margin-left: 8px; 
+			cursor: help; 
+		}
+		.input { 
+			width: 100%; 
+			padding: 10px 12px; 
+			border: 1px solid #d1d5db; 
+			border-radius: 6px; 
+			font-size: 14px; 
+			outline: none; 
+			background: #fff; 
+			transition: border-color 0.2s, box-shadow 0.2s; 
+		}
+		.input:focus { 
+			border-color: #0ea5e9; 
+			box-shadow: 0 0 0 3px rgba(14,165,233,0.16); 
+		}
+		.select { 
+			width: 100%; 
+			padding: 10px 12px; 
+			border: 1px solid #d1d5db; 
+			border-radius: 6px; 
+			font-size: 14px; 
+			outline: none; 
+			background: #fff; 
+			cursor: pointer; 
+		}
+		.select:focus { 
+			border-color: #0ea5e9; 
+			box-shadow: 0 0 0 3px rgba(14,165,233,0.16); 
+		}
+		.multi-select-container { 
+			position: relative; 
+		}
+		.multi-select-input { 
+			width: 100%; 
+			padding: 10px 12px; 
+			border: 1px solid #d1d5db; 
+			border-radius: 6px; 
+			font-size: 14px; 
+			outline: none; 
+			background: #fff; 
+			cursor: pointer; 
+			display: flex; 
+			align-items: center; 
+			justify-content: space-between; 
+		}
+		.multi-select-input:focus { 
+			border-color: #0ea5e9; 
+			box-shadow: 0 0 0 3px rgba(14,165,233,0.16); 
+		}
+		.multi-select-dropdown { 
+			position: absolute; 
+			top: 100%; 
+			left: 0; 
+			right: 0; 
+			background: #fff; 
+			border: 1px solid #d1d5db; 
+			border-radius: 6px; 
+			box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+			z-index: 1000; 
+			max-height: 300px; 
+			overflow-y: auto; 
+			display: none; 
+		}
+		.multi-select-dropdown.show { 
+			display: block; 
+		}
+		.multi-select-header { 
+			padding: 12px; 
+			border-bottom: 1px solid #e5e7eb; 
+			background: #f9fafb; 
+		}
+		.multi-select-search { 
+			width: 100%; 
+			padding: 8px 12px; 
+			border: 1px solid #d1d5db; 
+			border-radius: 4px; 
+			font-size: 14px; 
+			outline: none; 
+		}
+		.multi-select-options { 
+			padding: 8px 0; 
+		}
+		.multi-select-option { 
+			padding: 8px 12px; 
+			cursor: pointer; 
+			display: flex; 
+			align-items: center; 
+			gap: 8px; 
+		}
+		.multi-select-option:hover { 
+			background: #f3f4f6; 
+		}
+		.multi-select-option.selected { 
+			background: #e0f2fe; 
+		}
+		.multi-select-option input[type="checkbox"] { 
+			margin: 0; 
+		}
+		.selected-tags { 
+			display: flex; 
+			flex-wrap: wrap; 
+			gap: 6px; 
+			margin-top: 8px; 
+		}
+		.selected-tag { 
+			background: #e0f2fe; 
+			color: #0ea5e9; 
+			padding: 4px 8px; 
+			border-radius: 4px; 
+			font-size: 12px; 
+			display: flex; 
+			align-items: center; 
+			gap: 4px; 
+		}
+		.remove-tag { 
+			cursor: pointer; 
+			font-weight: bold; 
+		}
+		.btn { 
+			height: 40px; 
+			padding: 0 20px; 
+			border: 1px solid #d1d5db; 
+			background: #fff; 
+			border-radius: 6px; 
+			cursor: pointer; 
+			font-size: 14px; 
+			font-weight: 500; 
+			transition: all 0.2s; 
+		}
+		.btn.primary { 
+			background: #10b981; 
+			color: #fff; 
+			border-color: #10b981; 
+		}
+		.btn.primary:hover { 
+			background: #059669; 
+			border-color: #059669; 
+		}
+		.btn:hover { 
+			background: #f9fafb; 
+		}
+		.arrow-down { 
+			width: 0; 
+			height: 0; 
+			border-left: 5px solid transparent; 
+			border-right: 5px solid transparent; 
+			border-top: 5px solid #6b7280; 
+		}
+		.placeholder-text { 
+			color: #9ca3af; 
+		}
+		.tip { background: #ecfeff; border: 1px solid #a5f3fc; color: #155e75; padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h1>新建智能体</h1>
+		<button class="btn primary" onclick="submitForm()">提交</button>
+	</div>
+	
+	<div class="container">
+		<div id="editTip" class="tip" style="display:none;">当前为编辑模式，已自动回填智能体信息，可修改后提交。</div>
+		<div class="form-card">
+			<div class="section-title">基本信息</div>
+			<div class="section-subtitle">所属租户: 数据与存储</div>
+			
+			<form id="agentForm">
+				<div class="form-group">
+					<label class="form-label">
+						agent名称
+						<span class="required">*</span>
+						<span class="help-icon" title="请输入智能体的名称，用于标识和管理">②</span>
+					</label>
+					<input type="text" class="input" id="agentName" placeholder="请输入agent名称" required>
+				</div>
+				<div class="form-group">
+					<label class="form-label">
+						数据服务类型
+						<span class="required">*</span>
+					</label>
+					<select class="select" id="dataServiceType" required>
+						<option value="">请选择数据服务类型</option>
+						<option value="mysql">MySQL</option>
+						<option value="oceanbase">OceanBase</option>
+						<option value="lidbview">LiDBView</option>
+						<option value="postgresql">PostgreSQL</option>
+						<option value="oracle">Oracle</option>
+						<option value="sqlserver">SQL Server</option>
+					</select>
+				</div>
+				
+				<div class="form-row">
+					<div class="form-group">
+						<label class="form-label">
+							环境
+							<span class="required">*</span>
+						</label>
+						<select class="select" id="environment" required>
+							<option value="">环境</option>
+							<option value="dev">开发环境</option>
+							<option value="test">测试环境</option>
+							<option value="prod">生产环境</option>
+						</select>
+					</div>
+					
+					<div class="form-group">
+						<label class="form-label">
+							单元
+							<span class="required">*</span>
+						</label>
+						<select class="select" id="unit" required>
+							<option value="">单元</option>
+							<option value="unit1">单元1</option>
+							<option value="unit2">单元2</option>
+							<option value="unit3">单元3</option>
+						</select>
+					</div>
+				</div>
+				
+				<div class="form-row">
+					<div class="form-group">
+						<label class="form-label">
+							数据库名
+							<span class="required">*</span>
+						</label>
+						<select class="select" id="databaseName" required>
+							<option value="">数据库名</option>
+							<option value="db1">数据库1</option>
+							<option value="db2">数据库2</option>
+							<option value="db3">数据库3</option>
+						</select>
+					</div>
+					
+					<div class="form-group">
+						<label class="form-label">
+							数据表名
+							<span class="required">*</span>
+						</label>
+						<div class="multi-select-container">
+							<div class="multi-select-input" onclick="toggleMultiSelect()">
+								<span id="tablePlaceholder" class="placeholder-text">请选择数据表名</span>
+								<span class="arrow-down"></span>
+							</div>
+							<div class="multi-select-dropdown" id="multiSelectDropdown">
+								<div class="multi-select-header">
+									<input type="text" class="multi-select-search" placeholder="搜索表名..." oninput="filterTables(this.value)">
+									<div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+										<label style="font-size: 12px; cursor: pointer;">
+											<input type="checkbox" onchange="toggleAllTables(this.checked)"> 全选
+										</label>
+										<span style="font-size: 12px; color: #6b7280;" id="selectedCount">已选 0</span>
+									</div>
+								</div>
+								<div class="multi-select-options" id="tableOptions">
+									<!-- 表选项将通过JavaScript动态生成 -->
+								</div>
+							</div>
+							<div class="selected-tags" id="selectedTags"></div>
+						</div>
+					</div>
+				</div>
+				
+				<div class="form-group">
+					<label class="form-label">
+						业务描述
+						<span class="required">*</span>
+					</label>
+					<input type="text" class="input" id="businessDescription" placeholder="请输入业务描述" required>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<script>
+		// 模拟表数据
+		const mockTables = [
+			'users', 'orders', 'products', 'categories', 'inventory',
+			'customers', 'payments', 'shipping', 'reviews', 'analytics',
+			'logs', 'config', 'sessions', 'notifications', 'reports'
+		];
+		
+		let selectedTables = new Set();
+		let filteredTables = [...mockTables];
+		
+		// 初始化页面
+		document.addEventListener('DOMContentLoaded', function() {
+			renderTableOptions();
+			updateSelectedCount();
+			updateSelectedTags();
+			// 回填
+			try {
+				const data = localStorage.getItem('agent_form_data');
+				const isEdit = localStorage.getItem('agent_edit_mode') === '1';
+				if (data) {
+					const v = JSON.parse(data);
+					if (v.agentName) document.getElementById('agentName').value = v.agentName;
+					if (v.dataServiceType) document.getElementById('dataServiceType').value = v.dataServiceType;
+					if (v.environment) document.getElementById('environment').value = v.environment;
+					if (v.unit) document.getElementById('unit').value = v.unit;
+					if (v.databaseName) document.getElementById('databaseName').value = v.databaseName;
+					if (Array.isArray(v.selectedTables)) {
+						selectedTables = new Set(v.selectedTables);
+						updateSelectedTags();
+						updateSelectedCount();
+						updatePlaceholder();
+					}
+					if (v.businessDescription) document.getElementById('businessDescription').value = v.businessDescription;
+					if (isEdit) document.getElementById('editTip').style.display = 'block';
+				}
+			} catch (e) { console.warn('预填失败', e); }
+		});
+		
+		// 切换多选下拉框
+		function toggleMultiSelect() {
+			const dropdown = document.getElementById('multiSelectDropdown');
+			dropdown.classList.toggle('show');
+		}
+		
+		// 渲染表选项
+		function renderTableOptions() {
+			const container = document.getElementById('tableOptions');
+			container.innerHTML = '';
+			
+			filteredTables.forEach(table => {
+				const option = document.createElement('div');
+				option.className = `multi-select-option ${selectedTables.has(table) ? 'selected' : ''}`;
+				option.innerHTML = `
+					<input type="checkbox" ${selectedTables.has(table) ? 'checked' : ''} onchange="toggleTable('${table}', this.checked)">
+					<span>${table}</span>
+				`;
+				container.appendChild(option);
+			});
+		}
+		
+		// 切换表选择
+		function toggleTable(table, checked) {
+			if (checked) {
+				selectedTables.add(table);
+			} else {
+				selectedTables.delete(table);
+			}
+			updateSelectedCount();
+			updateSelectedTags();
+			updatePlaceholder();
+		}
+		
+		// 全选/取消全选
+		function toggleAllTables(checked) {
+			if (checked) {
+				filteredTables.forEach(table => selectedTables.add(table));
+			} else {
+				selectedTables.clear();
+			}
+			renderTableOptions();
+			updateSelectedCount();
+			updateSelectedTags();
+			updatePlaceholder();
+		}
+		
+		// 过滤表
+		function filterTables(keyword) {
+			filteredTables = mockTables.filter(table => 
+				table.toLowerCase().includes(keyword.toLowerCase())
+			);
+			renderTableOptions();
+		}
+		
+		// 更新选中数量
+		function updateSelectedCount() {
+			document.getElementById('selectedCount').textContent = `已选 ${selectedTables.size}`;
+		}
+		
+		// 更新选中标签
+		function updateSelectedTags() {
+			const container = document.getElementById('selectedTags');
+			container.innerHTML = '';
+			
+			selectedTables.forEach(table => {
+				const tag = document.createElement('div');
+				tag.className = 'selected-tag';
+				tag.innerHTML = `
+					<span>${table}</span>
+					<span class="remove-tag" onclick="removeTable('${table}')">&times;</span>
+				`;
+				container.appendChild(tag);
+			});
+		}
+		
+		// 移除表
+		function removeTable(table) {
+			selectedTables.delete(table);
+			renderTableOptions();
+			updateSelectedCount();
+			updateSelectedTags();
+			updatePlaceholder();
+		}
+		
+		// 更新占位符
+		function updatePlaceholder() {
+			const placeholder = document.getElementById('tablePlaceholder');
+			if (selectedTables.size === 0) {
+				placeholder.textContent = '请选择数据表名';
+				placeholder.className = 'placeholder-text';
+			} else {
+				placeholder.textContent = `已选择 ${selectedTables.size} 个表`;
+				placeholder.className = '';
+			}
+		}
+		
+		// 点击外部关闭下拉框
+		document.addEventListener('click', function(event) {
+			const container = document.querySelector('.multi-select-container');
+			const dropdown = document.getElementById('multiSelectDropdown');
+			
+			if (!container.contains(event.target)) {
+				dropdown.classList.remove('show');
+			}
+		});
+		
+		// 提交表单
+		function submitForm() {
+			const form = document.getElementById('agentForm');
+			const formData = new FormData(form);
+			
+			// 验证必填字段
+			const requiredFields = ['agentName', 'environment', 'unit', 'databaseName', 'dataServiceType', 'businessDescription'];
+			let isValid = true;
+			
+			requiredFields.forEach(field => {
+				const value = document.getElementById(field).value.trim();
+				if (!value) {
+					alert(`请填写${getFieldLabel(field)}`);
+					isValid = false;
+					return;
+				}
+			});
+			
+			if (selectedTables.size === 0) {
+				alert('请至少选择一个数据表');
+				isValid = false;
+				return;
+			}
+			
+			if (!isValid) return;
+			
+			// 收集表单数据
+			const formPayload = {
+				agentName: document.getElementById('agentName').value.trim(),
+				environment: document.getElementById('environment').value,
+				unit: document.getElementById('unit').value,
+				databaseName: document.getElementById('databaseName').value,
+				dataServiceType: document.getElementById('dataServiceType').value,
+				selectedTables: Array.from(selectedTables),
+				businessDescription: document.getElementById('businessDescription').value.trim()
+			};
+			
+			// 保存到localStorage并跳转到下一步
+			localStorage.setItem('agent_form_data', JSON.stringify(formPayload));
+			localStorage.removeItem('agent_edit_mode');
+			alert('表单提交成功！即将跳转到表选择与字段配置页面...');
+			
+			// 跳转到下一步
+			setTimeout(() => {
+				window.location.href = 'prototype_wireframe.html';
+			}, 1000);
+		}
+		
+		// 获取字段标签
+		function getFieldLabel(fieldId) {
+			const labels = {
+				'agentName': 'agent名称',
+				'environment': '环境',
+				'unit': '单元',
+				'databaseName': '数据库名',
+				'dataServiceType': '数据服务类型',
+				'businessDescription': '业务描述'
+			};
+			return labels[fieldId] || fieldId;
+		}
+	</script>
+</body>
+</html> 
